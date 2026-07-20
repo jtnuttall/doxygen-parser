@@ -111,6 +111,11 @@ data Config = Config {
     -- ^ When @Just dir@, doxygen XML output is written to @dir@
     -- and persists after 'parse' returns.  When 'Nothing' (default),
     -- a temporary directory is used and cleaned up automatically.
+  , aliases    :: [(Text, Text)]
+    -- ^ @ALIASES@ entries @(name, replacement)@, for headers that use
+    -- project-local doxygen commands (e.g. SDL's @\\threadsafety@ via
+    -- @("threadsafety", "\\par Thread safety:^^")@). Without a matching
+    -- alias doxygen passes the unknown command through as literal text.
   }
   deriving stock (Show, Eq)
 
@@ -123,6 +128,7 @@ defaultConfig = Config {
   , extractAll = True
   , quiet      = True
   , outputDir  = Nothing
+  , aliases    = []
   }
 
 {-------------------------------------------------------------------------------
@@ -309,6 +315,9 @@ generateConfig config inputPaths outputDir = Text.unlines $
   , "JAVADOC_BANNER    = " <> boolOption True
   , "QUIET             = " <> boolOption config.quiet
   ]
+  ++ [ "ALIASES          += " <> name <> "=\"" <> replacement <> "\""
+     | (name, replacement) <- config.aliases
+     ]
   where
     boolOption :: Bool -> Text
     boolOption True  = "YES"
@@ -989,6 +998,16 @@ parseBlock el cursor = case XML.nameLocalName (XML.elementName el) of
   "table" ->
     let (childWarns, children) = unzipBlocks (Cursor.child cursor)
     in  (childWarns, [Tag "table" children])
+
+  -- Section titles (@\<sectN\>\<title\>...@). Parsed via the inline parser:
+  -- the children are text nodes, which the block parser would drop.
+  -- Wrapping in a 'Paragraph' keeps the text when a consumer flattens the
+  -- 'Tag', and lets consumers match the title structurally (e.g. SDL's
+  -- @CategoryX@ header markers).
+  "title" ->
+    let (warns, inlines) = parseInlineChildren cursor
+        trimmed = trimEdges inlines
+    in  (warns, [Tag "title" [Paragraph trimmed | not (null trimmed)]])
 
   other ->
     let (childWarns, children) = unzipBlocks (Cursor.child cursor)
