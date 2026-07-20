@@ -2,7 +2,7 @@
 
 {-# OPTIONS_HADDOCK hide #-}
 
--- | Doxygen XML parser — internal implementation.
+-- | Doxygen XML parser, internal implementation.
 --
 -- This module contains the full implementation of the Doxygen XML parser.
 -- The public API is re-exported by "Doxygen.Parser"; this module additionally
@@ -20,7 +20,7 @@
 --
 -- [@\<file\>_8h.xml@]
 --   One per input file (e.g. @myheader_8h.xml@).  Lists all declarations
---   with their @refid@s — we don't parse comments from these directly.
+--   with their @refid@s, we don't parse comments from these directly.
 --
 -- [@group__\<name\>.xml@]
 --   One per @\@defgroup@\/@\@addtogroup@ group.  Contains the group title,
@@ -45,7 +45,6 @@ module Doxygen.Parser.Internal (
   , Doxygen(..)
   , emptyDoxygen
     -- * Lookup keys
-  , DoxygenKey(..)
   , lookupComment
     -- * Group sections
   , lookupGroupMembership
@@ -130,26 +129,6 @@ defaultConfig = Config {
   , outputDir  = Nothing
   , aliases    = []
   }
-
-{-------------------------------------------------------------------------------
-  Lookup keys
--------------------------------------------------------------------------------}
-
--- | Key for looking up a comment in the 'Doxygen' state
---
--- Unifies the four separate map lookups (declarations, structs, fields,
--- enum values) into a single 'Map' keyed by this type.
---
-data DoxygenKey
-  = KeyDecl { name :: Text }
-    -- ^ Function, typedef, variable, or enum (keyed by C name)
-  | KeyStruct { name :: Text }
-    -- ^ Struct\/union compound (keyed by C type name)
-  | KeyField { structName :: Text, fieldName :: Text }
-    -- ^ Struct\/union field
-  | KeyEnumValue { enumName :: Text, valueName :: Text }
-    -- ^ Enum value
-  deriving stock (Eq, Ord, Show)
 
 {-------------------------------------------------------------------------------
   State
@@ -324,7 +303,7 @@ generateConfig config inputPaths outputDir = Text.unlines $
     boolOption False = "NO"
 
 {-------------------------------------------------------------------------------
-  XML parsing — assembles Doxygen directly from XML files
+  XML parsing, assembles Doxygen directly from XML files
 -------------------------------------------------------------------------------}
 
 -- | Parse the XML output directory into a 'Result'
@@ -377,12 +356,12 @@ parseXMLOutput xmlDir = do
 data XMLFileResult = XMLFileResult {
     comments       :: Map DoxygenKey (Comment DoxyRef)
   , groupTitles    :: [(Text, Text)]
-    -- ^ (group name, title) — only populated for group XML files
+    -- ^ (group name, title), only populated for group XML files
   , groupChildren  :: [(Text, Text)]
-    -- ^ (child group name, parent group name) — derived from
+    -- ^ (child group name, parent group name), derived from
     -- @\<innergroup\>@ elements in group XML files
   , groupMembers   :: [(Text, Text)]
-    -- ^ (declaration name, group name) — derived from
+    -- ^ (declaration name, group name), derived from
     -- @\<innerclass\>@ elements in group XML files (structs\/unions)
   , warnings       :: [Warning]
   }
@@ -592,7 +571,7 @@ extractEntity cd =
     -------------------------------------------------------------------}
 
     -- Top-level declarations (functions, typedefs, enums).
-    -- Struct fields have a qualifiedname containing "::" — exclude those.
+    -- Struct fields have a qualifiedname containing "::", exclude those.
     toDeclMap :: [MemberInfo] -> [(DoxygenKey, Comment DoxyRef)]
     toDeclMap ms =
       [ (KeyDecl mi.miName, mi.miComment)
@@ -669,7 +648,7 @@ extractEntity cd =
                (evp.warnings ++ commentWarns, [])
 
     {-------------------------------------------------------------------
-      Child classifiers — one fold per XML element type
+      Child classifiers, one fold per XML element type
 
       Each classifier iterates children exactly once, dispatching on
       element name.  Known-but-ignored elements are listed explicitly
@@ -806,7 +785,7 @@ nodeElementName c = case Cursor.node c of
 
 -- | What to do with a child element
 data ChildAction a
-  = Skip      -- ^ Known child, not needed here — skip silently
+  = Skip      -- ^ Known child, not needed here, skip silently
   | Yield a   -- ^ Known child, include in results
 
 -- | Process element children, dispatching on element name.
@@ -814,9 +793,9 @@ data ChildAction a
 -- For each element child, calls the handler with the element name and
 -- cursor.  The handler returns:
 --
---   * @Just (Yield x)@ — include @x@ in the result list
---   * @Just Skip@ — known child, skip silently
---   * @Nothing@ — unknown child, emit a 'StructureLevel' warning
+--   * @Just (Yield x)@, include @x@ in the result list
+--   * @Just Skip@, known child, skip silently
+--   * @Nothing@, unknown child, emit a 'StructureLevel' warning
 --
 -- Text and other non-element nodes are silently skipped.
 forChildren
@@ -956,7 +935,7 @@ parseBlock el cursor = case XML.nameLocalName (XML.elementName el) of
     let children = Cursor.child cursor
         titles = [extractText c | c <- children, nodeElementName c == Just "title"]
         (kindWarns, kind) = parseSimpleSectKind cursor (listToMaybe titles)
-        -- Filter <title> — already consumed by parseSimpleSectKind for SSPar
+        -- Filter <title>, already consumed by parseSimpleSectKind for SSPar
         contentChildren = filter (not . isTitle) children
         (contentWarns, content) = unzipBlocks contentChildren
     in  (kindWarns ++ contentWarns, [SimpleSect kind content])
@@ -1251,7 +1230,7 @@ splitQualifiedName qualName =
 --
 -- This is a deny-list: it excludes known non-entity files.  If future doxygen
 -- versions add new auxiliary XML files, they would pass through and be parsed
--- as entities — harmlessly yielding an empty result since they won't contain
+-- as entities, harmlessly yielding an empty result since they won't contain
 -- a recognised @\<compounddef\>@.
 --
 -- Excludes schema files (@.xsd@), XSLT files, @index.xml@, @Doxyfile.xml@,

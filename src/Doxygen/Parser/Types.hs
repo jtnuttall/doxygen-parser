@@ -11,6 +11,8 @@
 -- * 'Inline' represents inline formatting and cross-references
 -- * 'Param' represents documented parameters with direction
 --
+-- It also provides 'DoxygenKey', the key used to index parsed comments.
+--
 -- Intended for qualified import:
 --
 -- @
@@ -30,6 +32,8 @@ module Doxygen.Parser.Types (
   , ParamListKind(..)
   , ParamDirection(..)
   , SimpleSectKind(..)
+    -- * Lookup keys
+  , DoxygenKey(..)
   ) where
 
 import Data.Text (Text)
@@ -41,16 +45,19 @@ import GHC.Generics (Generic)
 
 -- | A Doxygen comment with brief and detailed sections
 --
--- The @ref@ parameter is the type used for cross-references ('Ref').
--- The parser produces @Comment Text@ where references are raw C names.
--- Consumers can 'fmap' to resolve these to their own identifier types.
+-- The @ref@ parameter is the cross-reference type.  The parser produces
+-- @Comment DoxyRef@, where each 'DoxyRef' carries the raw C name and the
+-- optional @kindref@.  Consumers can 'fmap' or 'traverse' to resolve these
+-- to their own identifier types.
 --
 -- Corresponds to the @\<briefdescription\>@ and @\<detaileddescription\>@
 -- elements in Doxygen XML output.
 --
 data Comment ref = Comment {
     brief    :: [Inline ref]
+    -- ^ Brief one-line summary, from the @\<briefdescription\>@ element.
   , detailed :: [Block ref]
+    -- ^ Detailed description blocks, from @\<detaileddescription\>@.
   }
   deriving stock (Functor, Foldable, Traversable, Show, Eq, Generic)
 
@@ -108,8 +115,11 @@ data Inline ref
 --
 data Param ref = Param {
     paramName      :: Text
+    -- ^ Parameter name, from the @\<parametername\>@ element.
   , paramDirection :: Maybe ParamDirection
+    -- ^ Direction annotation (@in@, @out@, @inout@), when present.
   , paramDesc      :: [Block ref]
+    -- ^ Parameter description blocks.
   }
   deriving stock (Functor, Foldable, Traversable, Show, Eq, Generic)
 
@@ -157,7 +167,7 @@ data SimpleSectKind
   | SSPost
     -- ^ @\@post@
   | SSPar Text
-    -- ^ @\@par Title:@ — the 'Text' is the paragraph title
+    -- ^ @\@par Title:@ (the 'Text' is the paragraph title)
   | SSDeprecated
     -- ^ @\@deprecated@
   | SSRemark
@@ -195,6 +205,28 @@ data RefKind
 -- when present.
 data DoxyRef = DoxyRef {
     doxyRefName :: Text
+    -- ^ The referenced C name, as shown in the comment.
   , doxyRefKind :: Maybe RefKind
+    -- ^ The @kindref@ attribute, when Doxygen records it.
   }
   deriving stock (Show, Eq, Generic)
+
+{-------------------------------------------------------------------------------
+  Lookup keys
+-------------------------------------------------------------------------------}
+
+-- | Key for looking up a comment in the parsed @Doxygen@ state.
+--
+-- Unifies the four separate map lookups (declarations, structs, fields,
+-- enum values) into a single @Map@ keyed by this type.
+--
+data DoxygenKey
+  = KeyDecl { name :: Text }
+    -- ^ Function, typedef, variable, or enum (keyed by C name)
+  | KeyStruct { name :: Text }
+    -- ^ Struct\/union compound (keyed by C type name)
+  | KeyField { structName :: Text, fieldName :: Text }
+    -- ^ Struct\/union field
+  | KeyEnumValue { enumName :: Text, valueName :: Text }
+    -- ^ Enum value
+  deriving stock (Eq, Ord, Show)
