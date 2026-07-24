@@ -50,6 +50,25 @@ tests =
         \case
           ParamList _ params -> length params @?= 2
           b -> assertFailure $ "unexpected: " ++ show b
+
+  , testCase "param name wrapped in a ref survives" $ do
+      -- Doxygen cross-links a parameter name it can resolve, wrapping it:
+      -- the name must come from the descendant text, not direct children
+      -- (which see only the empty string around the <ref>).
+      let xml = wrap $ Text.concat
+            [ "<parameterlist kind=\"param\">"
+            , "<parameteritem>"
+            , "  <parameternamelist>"
+            , "    <parametername><ref refid=\"SDL__stdinc_8h_1afbf\" kindref=\"member\">size</ref></parametername>"
+            , "  </parameternamelist>"
+            , "  <parameterdescription><para>How many bytes.</para></parameterdescription>"
+            , "</parameteritem>"
+            , "</parameterlist>"
+            ]
+      let (_, bs) = parseBlockFromXML xml
+      case bs of
+        [ParamList _ [p]] -> p.paramName @?= "size"
+        _ -> assertFailure $ "unexpected: " ++ show bs
   ]
   where
     mkParamTest :: String -> Maybe Text -> Text -> Maybe ParamDirection -> TestTree

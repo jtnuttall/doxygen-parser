@@ -786,6 +786,15 @@ data MemberInfo = MemberInfo {
 extractText :: Cursor -> Text
 extractText c = Text.concat $ c $/ Cursor.content
 
+-- | Like 'extractText', but concatenating /all/ descendant text rather
+-- than direct children only. Doxygen sometimes wraps an element's text in
+-- markup — notably a @\<parametername\>@ whose name it can cross-link
+-- becomes @\<parametername\>\<ref ...\>name\</ref\>\</parametername\>@ —
+-- and direct-child extraction sees only the empty string around the
+-- wrapper.
+extractTextDeep :: Cursor -> Text
+extractTextDeep c = Text.concat $ c $// Cursor.content
+
 -- | Get the local element name from a cursor, if it's an element node
 nodeElementName :: Cursor -> Maybe Text
 nodeElementName c = case Cursor.node c of
@@ -1134,7 +1143,7 @@ parseParamItem cursor =
       (nameListWarns, nameElems) =
         collectWarnings $ map classifyParamNameList nameListCursors
 
-  in case listToMaybe $ map extractText nameElems of
+  in case listToMaybe $ map extractTextDeep nameElems of
     Nothing    -> (itemWarns ++ nameListWarns, Nothing)
     Just pname ->
       let direction = listToMaybe nameElems >>= \n ->
