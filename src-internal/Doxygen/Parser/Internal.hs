@@ -66,6 +66,7 @@ module Doxygen.Parser.Internal (
   , ChildAction(..)
   , readXML
   , parseXMLOutput
+  , generateConfig
   ) where
 
 import Control.Exception (Exception, SomeException, catch, throwIO)
@@ -113,8 +114,7 @@ data Config = Config {
   , aliases    :: [(Text, Text)]
     -- ^ @ALIASES@ entries @(name, replacement)@, for headers that use
     -- project-local doxygen commands (e.g. SDL's @\\threadsafety@ via
-    -- @("threadsafety", "\\par Thread safety:^^")@). Without a matching
-    -- alias doxygen passes the unknown command through as literal text.
+    -- @("threadsafety", "\\par Thread safety:^^")@).
   }
   deriving stock (Show, Eq)
 
@@ -294,13 +294,22 @@ generateConfig config inputPaths outputDir = Text.unlines $
   , "JAVADOC_BANNER    = " <> boolOption True
   , "QUIET             = " <> boolOption config.quiet
   ]
-  ++ [ "ALIASES          += " <> name <> "=\"" <> replacement <> "\""
+  ++ [ appendToTag "ALIASES" (keyValuePair name replacement)
      | (name, replacement) <- config.aliases
      ]
   where
+    quoted :: Text -> Text
+    quoted value = "\"" <> value <> "\""
+
     boolOption :: Bool -> Text
     boolOption True  = "YES"
     boolOption False = "NO"
+
+    appendToTag :: Text -> Text -> Text
+    appendToTag tag value = tag <> " += " <> value
+
+    keyValuePair :: Text -> Text -> Text
+    keyValuePair key value = key <> "=" <> quoted value
 
 {-------------------------------------------------------------------------------
   XML parsing, assembles Doxygen directly from XML files
