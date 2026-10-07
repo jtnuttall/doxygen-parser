@@ -67,6 +67,7 @@ module Doxygen.Parser.Internal (
   , ChildAction(..)
   , readXML
   , parseXMLOutput
+  , generateConfig
   ) where
 
 import Control.Exception (Exception, SomeException, catch, throwIO)
@@ -111,6 +112,10 @@ data Config = Config {
     -- ^ When @Just dir@, doxygen XML output is written to @dir@
     -- and persists after 'parse' returns.  When 'Nothing' (default),
     -- a temporary directory is used and cleaned up automatically.
+  , aliases    :: [(Text, Text)]
+    -- ^ @ALIASES@ entries @(name, replacement)@, for headers that use
+    -- project-local doxygen commands (e.g. SDL's @\\threadsafety@ via
+    -- @("threadsafety", "\\par Thread safety:^^")@).
   }
   deriving stock (Show, Eq)
 
@@ -123,6 +128,7 @@ defaultConfig = Config {
   , extractAll = True
   , quiet      = True
   , outputDir  = Nothing
+  , aliases    = []
   }
 
 {-------------------------------------------------------------------------------
@@ -289,10 +295,33 @@ generateConfig config inputPaths outputDir = Text.unlines $
   , "JAVADOC_BANNER    = " <> boolOption True
   , "QUIET             = " <> boolOption config.quiet
   ]
+  ++ [ appendToTag "ALIASES" (keyValuePair name replacement)
+     | (name, replacement) <- config.aliases
+     ]
   where
+    quoted :: Text -> Text
+    quoted value = "\"" <> value <> "\""
+
+    -- Doxygen ends a quoted value at the first unescaped double quote, and a
+    -- raw newline would start a new Doxyfile statement.
+    --
+    -- Order matters here. CRLF needs to be evaluated before CR or LF alone.
+    escaped :: Text -> Text
+    escaped =
+          Text.replace "\"" "\\\""
+        . Text.replace "\n" "^^"
+        . Text.replace "\r" "^^"
+        . Text.replace "\r\n" "^^"
+
     boolOption :: Bool -> Text
     boolOption True  = "YES"
     boolOption False = "NO"
+
+    appendToTag :: Text -> Text -> Text
+    appendToTag tag value = tag <> " += " <> value
+
+    keyValuePair :: Text -> Text -> Text
+    keyValuePair key value = key <> "=" <> quoted (escaped value)
 
 {-------------------------------------------------------------------------------
   XML parsing, assembles Doxygen directly from XML files
@@ -973,6 +1002,16 @@ parseBlock el cursor = case XML.nameLocalName (XML.elementName el) of
   "table" ->
     let (childWarns, children) = unzipBlocks (Cursor.child cursor)
     in  (childWarns, [Tag "table" children])
+
+  -- Section titles (@\<sectN\>\<title\>...@). Parsed via the inline parser:
+  -- the children are text nodes, which the block parser would drop.
+  -- Wrapping in a 'Paragraph' keeps the text when a consumer flattens the
+  -- 'Tag', and lets consumers match the title structurally (e.g. SDL's
+  -- @CategoryX@ header markers).
+  "title" ->
+    let (warns, inlines) = parseInlineChildren cursor
+        trimmed = trimEdges inlines
+    in  (warns, [Tag "title" [Paragraph trimmed | not (null trimmed)]])
 
   other ->
     let (childWarns, children) = unzipBlocks (Cursor.child cursor)
