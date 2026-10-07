@@ -21,6 +21,11 @@ tests =
                   , ("sdlversion", "3.2.0")
                   , ("quotation", "This is an inner \"quotation\"!")
                   , ("newline", "This is a\nmultiline entry.")
+                  , ("empty", "")
+                  , ("crlf", "CR\rLF\nCRLF\r\nEND")
+                  , ("math", "2+2-1=3")
+                  , ("carets", "look up ^^")
+                  , ("numeric_alias_123", "val")
                   ]
               }
       aliasLines config
@@ -28,6 +33,11 @@ tests =
             , "ALIASES += sdlversion=\"3.2.0\""
             , "ALIASES += quotation=\"This is an inner \\\"quotation\\\"!\""
             , "ALIASES += newline=\"This is a^^multiline entry.\""
+            , "ALIASES += empty=\"\""
+            , "ALIASES += crlf=\"CR^^LF^^CRLF^^END\""
+            , "ALIASES += math=\"2+2-1=3\""
+            , "ALIASES += carets=\"look up ^^\""
+            , "ALIASES += numeric_alias_123=\"val\""
             ]
   ]
 

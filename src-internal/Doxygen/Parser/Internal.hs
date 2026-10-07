@@ -299,11 +299,19 @@ generateConfig config inputPaths outputDir = Text.unlines $
      | (name, replacement) <- config.aliases
      ]
   where
+    quoted :: Text -> Text
+    quoted value = "\"" <> value <> "\""
+
     -- Doxygen ends a quoted value at the first unescaped double quote, and a
     -- raw newline would start a new Doxyfile statement.
-    quoted :: Text -> Text
-    quoted value =
-      "\"" <> Text.replace "\n" "^^" (Text.replace "\"" "\\\"" value) <> "\""
+    --
+    -- Order matters here. CRLF needs to be evaluated before CR or LF alone.
+    escaped :: Text -> Text
+    escaped =
+          Text.replace "\"" "\\\""
+        . Text.replace "\n" "^^"
+        . Text.replace "\r" "^^"
+        . Text.replace "\r\n" "^^"
 
     boolOption :: Bool -> Text
     boolOption True  = "YES"
@@ -313,7 +321,7 @@ generateConfig config inputPaths outputDir = Text.unlines $
     appendToTag tag value = tag <> " += " <> value
 
     keyValuePair :: Text -> Text -> Text
-    keyValuePair key value = key <> "=" <> quoted value
+    keyValuePair key value = key <> "=" <> quoted (escaped value)
 
 {-------------------------------------------------------------------------------
   XML parsing, assembles Doxygen directly from XML files
