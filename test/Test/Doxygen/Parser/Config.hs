@@ -19,11 +19,15 @@ tests =
               { aliases =
                   [ ("threadsafety", "\\par Thread safety:^^")
                   , ("sdlversion", "3.2.0")
+                  , ("quotation", "This is an inner \"quotation\"!")
+                  , ("newline", "This is a\nmultiline entry.")
                   ]
               }
       aliasLines config
         @?= [ "ALIASES += threadsafety=\"\\par Thread safety:^^\""
             , "ALIASES += sdlversion=\"3.2.0\""
+            , "ALIASES += quotation=\"This is an inner \\\"quotation\\\"!\""
+            , "ALIASES += newline=\"This is a^^multiline entry.\""
             ]
   ]
 

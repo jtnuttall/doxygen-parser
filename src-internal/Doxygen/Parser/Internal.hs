@@ -299,8 +299,11 @@ generateConfig config inputPaths outputDir = Text.unlines $
      | (name, replacement) <- config.aliases
      ]
   where
+    -- Doxygen ends a quoted value at the first unescaped double quote, and a
+    -- raw newline would start a new Doxyfile statement.
     quoted :: Text -> Text
-    quoted value = "\"" <> value <> "\""
+    quoted value =
+      "\"" <> Text.replace "\n" "^^" (Text.replace "\"" "\\\"" value) <> "\""
 
     boolOption :: Bool -> Text
     boolOption True  = "YES"
